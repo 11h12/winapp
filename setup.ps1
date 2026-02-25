@@ -1,37 +1,46 @@
 # =====================================================================
-# 1. YOUR APP INPUT SECTION (Only edit this part!)
+# 1. YOUR APP INPUT SECTION (Mix Winget and Direct Links here!)
 # =====================================================================
 $MyApps = @(
+    # --- WINGET APPS (Public Software) ---
     [PSCustomObject]@{
-        Name       = "Lightshot"
-        Version    = "1.0.5"
-        LastUpdate = "2025-01-19"
-        InstallCmd = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LANG=en"
-        Url        = "https://github.com/11h12/winapp/releases/download/v1.0/setup-lightshot.exe"
+        Name       = "Lightshot (Screenshot Tool)"
+        Type       = "Winget"
+        Target     = "Skillbrains.Lightshot" # The official Winget ID
     },
     [PSCustomObject]@{
+        Name       = "Notion"
+        Type       = "Winget"
+        Target     = "Notion.Notion"
+    },
+    [PSCustomObject]@{
+        Name       = "Google Chrome"
+        Type       = "Winget"
+        Target     = "Google.Chrome"
+    },
+    
+    # --- DIRECT LINK APPS (Your Private Cloud Files) ---
+    [PSCustomObject]@{
         Name       = "Daily App (Mini Trello)"
-        Version    = "2.1.0"
-        LastUpdate = "2026-01-28"
-        InstallCmd = "/S"
-        Url        = "https://your-cloud-storage.com/daily-app.exe"
+        Type       = "DirectLink"
+        Target     = "https://your-cloud-storage.com/daily-app.exe"
+        InstallCmd = "/S" # Only needed for Direct Links
     },
     [PSCustomObject]@{
         Name       = "Jumpserver Client"
-        Version    = "3.0.1"
-        LastUpdate = "2026-01-18"
-        InstallCmd = "/VERYSILENT"
-        Url        = "https://your-cloud-storage.com/jumpserver-client.exe"
+        Type       = "DirectLink"
+        Target     = "https://your-cloud-storage.com/jumpserver-client.exe"
+        InstallCmd = "/VERYSILENT" 
     }
 )
 
 # =====================================================================
-# 2. THE ENGINE (Do not edit below this line)
+# 2. THE HYBRID ENGINE (Do not edit below this line)
 # =====================================================================
-Write-Host "Loading your cloud apps..." -ForegroundColor Cyan
+Write-Host "Loading your setup menu..." -ForegroundColor Cyan
 
-# This single line creates a beautiful, clickable Windows grid menu!
-$selectedApps = $MyApps | Out-GridView -Title "Select Apps to Install / Update (Hold CTRL to select multiple)" -PassThru
+# Display the GUI table
+$selectedApps = $MyApps | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
 
 if ($null -eq $selectedApps) {
     Write-Host "No apps selected. Exiting." -ForegroundColor Yellow
@@ -42,19 +51,46 @@ $tempDir = "$env:TEMP\MyCloudApps"
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
 foreach ($app in $selectedApps) {
-    Write-Host "`nProcessing: $($app.Name) (v$($app.Version))" -ForegroundColor Cyan
-    $fileName = "$tempDir\$($app.Name -replace ' ', '').exe"
-
-    Write-Host " -> Downloading from cloud..." -ForegroundColor Yellow
-    Invoke-WebRequest -Uri $app.Url -OutFile $fileName
-
-    Write-Host " -> Installing / Updating silently..." -ForegroundColor Yellow
-    $process = Start-Process -FilePath $fileName -ArgumentList $app.InstallCmd -Wait -PassThru -NoNewWindow
+    Write-Host "`n========================================" -ForegroundColor Cyan
+    Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
-    if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
-        Write-Host " -> Success!" -ForegroundColor Green
-    } else {
-        Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red
+    # --- IF IT IS A WINGET APP ---
+    if ($app.Type -eq "Winget") {
+        Write-Host " -> Installing via Winget..." -ForegroundColor Yellow
+        # Winget automatically handles silent flags, agreement acceptance, and downloading
+        $process = Start-Process -FilePath "winget" -ArgumentList "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements" -Wait -PassThru -NoNewWindow
+        
+        if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
+            Write-Host " -> Success!" -ForegroundColor Green
+        } else {
+            Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red
+        }
+    }
+    
+    # --- IF IT IS A DIRECT LINK APP ---
+    elseif ($app.Type -eq "DirectLink") {
+        $fileName = "$tempDir\$($app.Name -replace ' ', '').exe"
+
+        Write-Host " -> Downloading from cloud..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $app.Target -OutFile $fileName
+
+        Write-Host " -> Installing silently..." -ForegroundColor Yellow
+        $process = Start-Process -FilePath $fileName -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
+        
+        # 15-second bulletproof timer to prevent freezing
+        $countdown = 15
+        while (-not $process.HasExited -and $countdown -gt 0) {
+            Start-Sleep -Seconds 1
+            $countdown--
+        }
+        
+        if (-not $process.HasExited) {
+            Write-Host " -> App launched in background. Moving on..." -ForegroundColor Green
+        } elseif ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
+            Write-Host " -> Success!" -ForegroundColor Green
+        } else {
+            Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red
+        }
     }
 }
 
