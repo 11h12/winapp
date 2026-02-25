@@ -6,7 +6,7 @@ $MyApps = @(
         Name       = "Lightshot"
         Version    = "1.0.5"
         LastUpdate = "2025-01-19"
-        InstallCmd = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART"
+        InstallCmd = "/SP- /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LANG=en"
         Url        = "https://github.com/11h12/winapp/releases/download/v1.0/setup-lightshot.exe"
     },
     [PSCustomObject]@{
