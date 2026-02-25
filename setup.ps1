@@ -1,61 +1,61 @@
-# 1. Load the Windows GUI modules into PowerShell
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+# =====================================================================
+# 1. YOUR APP INPUT SECTION (Only edit this part!)
+# =====================================================================
+$MyApps = @(
+    [PSCustomObject]@{
+        Name       = "Lightshot"
+        Version    = "1.0.5"
+        LastUpdate = "2025-01-19"
+        InstallCmd = "/S"
+        Url        = "https://nas.dpham.one/sharing/ZRxp04LLW"
+    },
+    [PSCustomObject]@{
+        Name       = "Daily App (Mini Trello)"
+        Version    = "2.1.0"
+        LastUpdate = "2026-01-28"
+        InstallCmd = "/S"
+        Url        = "https://your-cloud-storage.com/daily-app.exe"
+    },
+    [PSCustomObject]@{
+        Name       = "Jumpserver Client"
+        Version    = "3.0.1"
+        LastUpdate = "2026-01-18"
+        InstallCmd = "/VERYSILENT"
+        Url        = "https://your-cloud-storage.com/jumpserver-client.exe"
+    }
+)
 
-# 2. Create the main popup window
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "My Custom Cloud App Installer"
-$form.Size = New-Object System.Drawing.Size(350, 250)
-$form.StartPosition = "CenterScreen"
+# =====================================================================
+# 2. THE ENGINE (Do not edit below this line)
+# =====================================================================
+Write-Host "Loading your cloud apps..." -ForegroundColor Cyan
 
-# 3. Create Checkbox for App 1
-$checkbox1 = New-Object System.Windows.Forms.CheckBox
-$checkbox1.Location = New-Object System.Drawing.Point(20, 20)
-$checkbox1.Size = New-Object System.Drawing.Size(250, 20)
-$checkbox1.Text = "Install App 1 (e.g., My Cloud Tool)"
-$form.Controls.Add($checkbox1)
+# This single line creates a beautiful, clickable Windows grid menu!
+$selectedApps = $MyApps | Out-GridView -Title "Select Apps to Install / Update (Hold CTRL to select multiple)" -PassThru
 
-# 4. Create Checkbox for App 2
-$checkbox2 = New-Object System.Windows.Forms.CheckBox
-$checkbox2.Location = New-Object System.Drawing.Point(20, 50)
-$checkbox2.Size = New-Object System.Drawing.Size(250, 20)
-$checkbox2.Text = "Install App 2 (e.g., Custom VPN)"
-$form.Controls.Add($checkbox2)
+if ($null -eq $selectedApps) {
+    Write-Host "No apps selected. Exiting." -ForegroundColor Yellow
+    exit
+}
 
-# 5. Create the "Install" Button
-$installButton = New-Object System.Windows.Forms.Button
-$installButton.Location = New-Object System.Drawing.Point(20, 100)
-$installButton.Size = New-Object System.Drawing.Size(120, 30)
-$installButton.Text = "Install Selected"
+$tempDir = "$env:TEMP\MyCloudApps"
+New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
-# 6. Define what happens when you click the button
-$installButton.Add_Click({
-    $form.Close() # Hide the menu and go back to the blue PowerShell screen
+foreach ($app in $selectedApps) {
+    Write-Host "`nProcessing: $($app.Name) (v$($app.Version))" -ForegroundColor Cyan
+    $fileName = "$tempDir\$($app.Name -replace ' ', '').exe"
+
+    Write-Host " -> Downloading from cloud..." -ForegroundColor Yellow
+    Invoke-WebRequest -Uri $app.Url -OutFile $fileName
+
+    Write-Host " -> Installing / Updating silently..." -ForegroundColor Yellow
+    $process = Start-Process -FilePath $fileName -ArgumentList $app.InstallCmd -Wait -PassThru -NoNewWindow
     
-    $tempDir = "$env:TEMP\MyCloudApps"
-    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
-
-    # If Checkbox 1 was ticked, download and install App 1
-    if ($checkbox1.Checked) {
-        Write-Host "Downloading and Installing App 1..." -ForegroundColor Yellow
-        $url1 = "https://your-cloud-link.com/app1.exe"
-        Invoke-WebRequest -Uri $url1 -OutFile "$tempDir\app1.exe"
-        Start-Process -FilePath "$tempDir\app1.exe" -ArgumentList "/S" -Wait -NoNewWindow
-        Write-Host "App 1 Installed!" -ForegroundColor Green
+    if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
+        Write-Host " -> Success!" -ForegroundColor Green
+    } else {
+        Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red
     }
+}
 
-    # If Checkbox 2 was ticked, download and install App 2
-    if ($checkbox2.Checked) {
-        Write-Host "Downloading and Installing App 2..." -ForegroundColor Yellow
-        $url2 = "https://your-cloud-link.com/app2.exe"
-        Invoke-WebRequest -Uri $url2 -OutFile "$tempDir\app2.exe"
-        Start-Process -FilePath "$tempDir\app2.exe" -ArgumentList "/S" -Wait -NoNewWindow
-        Write-Host "App 2 Installed!" -ForegroundColor Green
-    }
-
-    Write-Host "All selected apps are installed!" -ForegroundColor Cyan
-})
-$form.Controls.Add($installButton)
-
-# 7. Display the window to the user
-$form.ShowDialog()
+Write-Host "`nAll selected tasks complete!" -ForegroundColor Green
