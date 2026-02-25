@@ -7,7 +7,7 @@ $MyApps = @(
         Version    = "1.0.5"
         LastUpdate = "2025-01-19"
         InstallCmd = "/S"
-        Url        = "https://nas.dpham.one/sharing/93elgvc4u?download=true"
+        Url        = "https://github.com/11h12/winapp/releases/download/v1.0/setup-lightshot.exe"
     },
     [PSCustomObject]@{
         Name       = "Daily App (Mini Trello)"
