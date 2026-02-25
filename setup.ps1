@@ -1,41 +1,61 @@
-Write-Host "Starting Machine Setup..." -ForegroundColor Cyan
+# 1. Load the Windows GUI modules into PowerShell
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
 
-# 1. Install Public Apps via Winget (Fast, reliable, self-updating)
-Write-Host "Installing Public Applications..." -ForegroundColor Yellow
-$wingetApps = @(
-    "OpenJS.NodeJS",       # Node.js and npm
-    "Python.Python.3.11",  # Python
-    "VNGCorp.Zalo",        # Zalo App
-    "SimonTatham.PuTTY",   # SSH Client
-    "Google.Chrome"        # Web Browser
-)
+# 2. Create the main popup window
+$form = New-Object System.Windows.Forms.Form
+$form.Text = "My Custom Cloud App Installer"
+$form.Size = New-Object System.Drawing.Size(350, 250)
+$form.StartPosition = "CenterScreen"
 
-foreach ($app in $wingetApps) {
-    Write-Host "Installing $app..."
-    # --accept-package-agreements and --accept-source-agreements ensure it runs silently without prompting you
-    winget install --id $app -e --silent --accept-package-agreements --accept-source-agreements
-}
+# 3. Create Checkbox for App 1
+$checkbox1 = New-Object System.Windows.Forms.CheckBox
+$checkbox1.Location = New-Object System.Drawing.Point(20, 20)
+$checkbox1.Size = New-Object System.Drawing.Size(250, 20)
+$checkbox1.Text = "Install App 1 (e.g., My Cloud Tool)"
+$form.Controls.Add($checkbox1)
 
-# 2. Install Private Cloud Apps
-Write-Host "Installing Custom Cloud Applications..." -ForegroundColor Yellow
-$tempDir = "$env:TEMP\AppSetup"
-New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+# 4. Create Checkbox for App 2
+$checkbox2 = New-Object System.Windows.Forms.CheckBox
+$checkbox2.Location = New-Object System.Drawing.Point(20, 50)
+$checkbox2.Size = New-Object System.Drawing.Size(250, 20)
+$checkbox2.Text = "Install App 2 (e.g., Custom VPN)"
+$form.Controls.Add($checkbox2)
 
-# Define your direct download link
-$customAppUrl = "https://your-cloud-storage.com/your-custom-app.exe"
-$customAppPath = "$tempDir\custom-app.exe"
+# 5. Create the "Install" Button
+$installButton = New-Object System.Windows.Forms.Button
+$installButton.Location = New-Object System.Drawing.Point(20, 100)
+$installButton.Size = New-Object System.Drawing.Size(120, 30)
+$installButton.Text = "Install Selected"
 
-Write-Host "Downloading Custom App..."
-Invoke-WebRequest -Uri $customAppUrl -OutFile $customAppPath
+# 6. Define what happens when you click the button
+$installButton.Add_Click({
+    $form.Close() # Hide the menu and go back to the blue PowerShell screen
+    
+    $tempDir = "$env:TEMP\MyCloudApps"
+    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
-Write-Host "Installing Custom App silently..."
-# Capture the process to ensure reliability and check the exit code
-$installProcess = Start-Process -FilePath $customAppPath -ArgumentList "/S" -Wait -PassThru -NoNewWindow
+    # If Checkbox 1 was ticked, download and install App 1
+    if ($checkbox1.Checked) {
+        Write-Host "Downloading and Installing App 1..." -ForegroundColor Yellow
+        $url1 = "https://your-cloud-link.com/app1.exe"
+        Invoke-WebRequest -Uri $url1 -OutFile "$tempDir\app1.exe"
+        Start-Process -FilePath "$tempDir\app1.exe" -ArgumentList "/S" -Wait -NoNewWindow
+        Write-Host "App 1 Installed!" -ForegroundColor Green
+    }
 
-if ($installProcess.ExitCode -eq 0 -or $installProcess.ExitCode -eq 3010) {
-    Write-Host "Custom App installed successfully!" -ForegroundColor Green
-} else {
-    Write-Host "Failed to install Custom App. Exit Code: $($installProcess.ExitCode)" -ForegroundColor Red
-}
+    # If Checkbox 2 was ticked, download and install App 2
+    if ($checkbox2.Checked) {
+        Write-Host "Downloading and Installing App 2..." -ForegroundColor Yellow
+        $url2 = "https://your-cloud-link.com/app2.exe"
+        Invoke-WebRequest -Uri $url2 -OutFile "$tempDir\app2.exe"
+        Start-Process -FilePath "$tempDir\app2.exe" -ArgumentList "/S" -Wait -NoNewWindow
+        Write-Host "App 2 Installed!" -ForegroundColor Green
+    }
 
-Write-Host "Setup Complete! Welcome to your new machine." -ForegroundColor Green
+    Write-Host "All selected apps are installed!" -ForegroundColor Cyan
+})
+$form.Controls.Add($installButton)
+
+# 7. Display the window to the user
+$form.ShowDialog()
