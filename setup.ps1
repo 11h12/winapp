@@ -7,7 +7,7 @@ $MyApps = @(
         Version    = "1.0.5"
         LastUpdate = "2025-01-19"
         InstallCmd = "/S"
-        Url        = "https://nas.dpham.one/sharing/ZRxp04LLW"
+        Url        = "https://nas.dpham.one/sharing/pfuxuyFVG"
     },
     [PSCustomObject]@{
         Name       = "Daily App (Mini Trello)"
