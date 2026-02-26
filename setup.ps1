@@ -10,29 +10,20 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # 1. YOUR APP INPUT SECTION
 # =====================================================================
 $MyApps = @(
-    # --- WINGET APPS (Public Software) ---
+    # --- WINGET APPS ---
     [PSCustomObject]@{ Name="Lightshot"; Type="Winget"; Target="Skillbrains.Lightshot"; Version="5.5.0"; Date="2026-02-25" },
     [PSCustomObject]@{ Name="VS Code"; Type="Winget"; Target="Microsoft.VisualStudioCode"; Version="Latest"; Date="2026-02-26" },
     [PSCustomObject]@{ Name="GitHub Desktop"; Type="Winget"; Target="GitHub.GitHubDesktop"; Version="Latest"; Date="2026-02-26" },
     [PSCustomObject]@{ Name="Google Chrome"; Type="Winget"; Target="Google.Chrome"; Version="Latest"; Date="2026-02-15" },
+    [PSCustomObject]@{ Name="Visual Studio 2022"; Type="Winget"; Target="Microsoft.VisualStudio.2022.Community"; Args="--override `"--add Microsoft.VisualStudio.Workload.NativeDesktop --add Microsoft.VisualStudio.Workload.Python --passive --norestart`""; Version="Latest"; Date="2026-02-26" },
     
-    # Visual Studio with Python and C++ Workloads
-    [PSCustomObject]@{ 
-        Name    = "Visual Studio 2022" 
-        Type    = "Winget" 
-        Target  = "Microsoft.VisualStudio.2022.Community" 
-        Args    = "--override `"--add Microsoft.VisualStudio.Workload.NativeDesktop --add Microsoft.VisualStudio.Workload.Python --passive --norestart`""
-        Version = "Latest"; Date = "2026-02-26" 
-    },
-    
-    # --- DIRECT LINK APPS (Installers) ---
+    # --- YOUR REPOSITORY APPS (DirectLink) ---
     [PSCustomObject]@{ 
         Name       = "Antigravity IDE"
         Type       = "DirectLink"
-        # Official Google Direct Link for Windows x64
-        Target     = "https://antigravity.google/download/windows-x64" 
+        Target     = "https://github.com/11h12/winapp/releases/download/v1.0/Antigravity.exe" 
         InstallCmd = "/S" 
-        Version    = "1.18.4"; Date = "2026-02-21"
+        Version    = "1.0"; Date = "2026-02-26"
     },
     [PSCustomObject]@{ 
         Name       = "Daily App"
@@ -48,23 +39,22 @@ $MyApps = @(
 # =====================================================================
 Write-Host "Loading your setup menu..." -ForegroundColor Cyan
 
-# Select-Object ensures only the chosen columns show in the popup
-$selectedApps = $MyApps | Select-Object Name, Type, Version, Date | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
+# We store the full list in $Menu and use it to look up the 'Target' later
+$selectedNames = $MyApps | Select-Object Name, Version, Date | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
 
-if ($null -eq $selectedApps) { exit }
+if ($null -eq $selectedNames) { exit }
 
-foreach ($app in $selectedApps) {
-    # Find the original object from $MyApps to get Target and InstallCmd
-    $appData = $MyApps | Where-Object { $_.Name -eq $app.Name }
+foreach ($item in $selectedNames) {
+    # Look back at the original $MyApps list to find the URL/Target for this Name
+    $app = $MyApps | Where-Object { $_.Name -eq $item.Name }
 
     Write-Host "`n========================================" -ForegroundColor Cyan
-    Write-Host "Processing: $($appData.Name)" -ForegroundColor Cyan
+    Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
-    if ($appData.Type -eq "Winget") {
-        Write-Host " -> Checking/Installing via Winget..." -ForegroundColor Yellow
-        $argList = "install --id $($appData.Target) -e --silent --accept-package-agreements --accept-source-agreements"
-        if ($appData.Args) { $argList += " $($appData.Args)" }
-        
+    if ($app.Type -eq "Winget") {
+        Write-Host " -> Installing via Winget..." -ForegroundColor Yellow
+        $argList = "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements"
+        if ($app.Args) { $argList += " $($app.Args)" }
         $process = Start-Process -FilePath "winget" -ArgumentList $argList -Wait -PassThru -NoNewWindow -ErrorAction SilentlyContinue
         
         if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) { Write-Host " -> Success!" -ForegroundColor Green }
@@ -72,24 +62,17 @@ foreach ($app in $selectedApps) {
         else { Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red }
     }
     
-    elseif ($appData.Type -eq "DirectLink") {
-        $tempFile = "$env:TEMP\$($appData.Name -replace ' ', '').exe"
-        Write-Host " -> Downloading installer from $($appData.Target)..." -ForegroundColor Yellow
+    elseif ($app.Type -eq "DirectLink") {
+        $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
+        Write-Host " -> Downloading from your GitHub..." -ForegroundColor Yellow
+        Invoke-WebRequest -Uri $app.Target -OutFile $tempFile -ErrorAction Stop
         
-        try {
-            Invoke-WebRequest -Uri $appData.Target -OutFile $tempFile -ErrorAction Stop
-            
-            Write-Host " -> Running silent installation..." -ForegroundColor Yellow
-            $process = Start-Process -FilePath $tempFile -ArgumentList $appData.InstallCmd -PassThru -NoNewWindow
-            
-            # Wait for up to 30 seconds for the installer to finish
-            $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-            Write-Host " -> Process complete." -ForegroundColor Green
-        } catch {
-            Write-Host " -> ERROR: Could not download or run the file." -ForegroundColor Red
-        }
+        Write-Host " -> Installing silently..." -ForegroundColor Yellow
+        $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
+        $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
         
+        Write-Host " -> Complete." -ForegroundColor Green
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
 }
-Write-Host "`nAll selected tasks complete!" -ForegroundColor Cyan
+Write-Host "`nAll selected tasks finished!" -ForegroundColor Cyan
