@@ -22,7 +22,7 @@ $MyApps = @(
         Name       = "Antigravity IDE"
         Type       = "DirectLink"
         Target     = "https://github.com/11h12/winapp/releases/download/v1.0/Antigravity.exe" 
-        InstallCmd = "/S" 
+        InstallCmd = "/ALLUSERS /S /NORESTART" # Added /ALLUSERS to fix the Admin popup
         Version    = "1.0"; Date = "2026-02-26"
     },
     [PSCustomObject]@{ 
@@ -39,15 +39,12 @@ $MyApps = @(
 # =====================================================================
 Write-Host "Loading your setup menu..." -ForegroundColor Cyan
 
-# We store the full list in $Menu and use it to look up the 'Target' later
-$selectedNames = $MyApps | Select-Object Name, Version, Date | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
+# Use Passthru to get the full objects back, avoiding the 'null Uri' error
+$selectedApps = $MyApps | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
 
-if ($null -eq $selectedNames) { exit }
+if ($null -eq $selectedApps) { exit }
 
-foreach ($item in $selectedNames) {
-    # Look back at the original $MyApps list to find the URL/Target for this Name
-    $app = $MyApps | Where-Object { $_.Name -eq $item.Name }
-
+foreach ($app in $selectedApps) {
     Write-Host "`n========================================" -ForegroundColor Cyan
     Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
@@ -64,11 +61,14 @@ foreach ($item in $selectedNames) {
     
     elseif ($app.Type -eq "DirectLink") {
         $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
-        Write-Host " -> Downloading from your GitHub..." -ForegroundColor Yellow
+        Write-Host " -> Downloading from GitHub Release..." -ForegroundColor Yellow
         Invoke-WebRequest -Uri $app.Target -OutFile $tempFile -ErrorAction Stop
         
         Write-Host " -> Installing silently..." -ForegroundColor Yellow
+        # Running with /ALLUSERS will bypass that "User Installer" warning
         $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
+        
+        # 30s timeout for the installer
         $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
         
         Write-Host " -> Complete." -ForegroundColor Green
