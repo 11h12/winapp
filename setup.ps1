@@ -10,7 +10,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # 1. YOUR APP INPUT SECTION
 # =====================================================================
 $MyApps = @(
-    # --- WINGET APPS ---
+    # --- WINGET APPS (Public) ---
     [PSCustomObject]@{ Name="Lightshot"; Type="Winget"; Target="Skillbrains.Lightshot"; Version="5.5.0"; Date="2026-02-25" },
     [PSCustomObject]@{ Name="VS Code"; Type="Winget"; Target="Microsoft.VisualStudioCode"; Version="Latest"; Date="2026-02-26" },
     [PSCustomObject]@{ Name="GitHub Desktop"; Type="Winget"; Target="GitHub.GitHubDesktop"; Version="Latest"; Date="2026-02-26" },
@@ -26,7 +26,7 @@ $MyApps = @(
         Date    = "2026-02-26" 
     },
     
-    # --- GIT REPOS (Direct Clone) ---
+    # --- GIT REPOS (Antigravity) ---
     [PSCustomObject]@{ 
         Name    = "Clone Antigravity Repo"
         Type    = "GitClone"
@@ -36,7 +36,7 @@ $MyApps = @(
         Date    = "2026-02-26"
     },
 
-    # --- DIRECT LINK APPS ---
+    # --- DIRECT LINK APPS (Private) ---
     [PSCustomObject]@{ 
         Name    = "Daily App"
         Type    = "DirectLink"
@@ -60,7 +60,7 @@ foreach ($app in $selectedApps) {
     Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
     if ($app.Type -eq "Winget") {
-        Write-Host " -> Installing via Winget..." -ForegroundColor Yellow
+        Write-Host " -> Checking/Installing via Winget..." -ForegroundColor Yellow
         $argList = "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements"
         if ($app.Args) { $argList += " $($app.Args)" }
         
@@ -88,9 +88,15 @@ foreach ($app in $selectedApps) {
         $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
         Invoke-WebRequest -Uri $app.Target -OutFile $tempFile
         $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
-        $process | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
-        Write-Host " -> Process finished." -ForegroundColor Green
+        
+        # 15s timeout for background apps like Lightshot
+        $countdown = 15
+        while (-not $process.HasExited -and $countdown -gt 0) {
+            Start-Sleep -Seconds 1
+            $countdown--
+        }
+        Write-Host " -> Installation complete." -ForegroundColor Green
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
 }
-Write-Host "`nAll tasks complete!" -ForegroundColor Cyan
+Write-Host "`nAll selected tasks complete!" -ForegroundColor Cyan
