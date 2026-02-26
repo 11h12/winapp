@@ -10,7 +10,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # 1. YOUR APP INPUT SECTION
 # =====================================================================
 $MyApps = @(
-    # --- WINGET APPS ---
+    # --- WINGET APPS (Public Software) ---
     [PSCustomObject]@{ Name="Lightshot"; Type="Winget"; Target="Skillbrains.Lightshot"; Version="5.5.0"; Date="2026-02-25" },
     [PSCustomObject]@{ Name="VS Code"; Type="Winget"; Target="Microsoft.VisualStudioCode"; Version="Latest"; Date="2026-02-26" },
     [PSCustomObject]@{ Name="GitHub Desktop"; Type="Winget"; Target="GitHub.GitHubDesktop"; Version="Latest"; Date="2026-02-26" },
@@ -25,14 +25,14 @@ $MyApps = @(
         Version = "Latest"; Date = "2026-02-26" 
     },
     
-    # --- DIRECT LINK APPS (Installers) ---
+    # --- DIRECT LINK APPS (Private/Manual Installers) ---
     [PSCustomObject]@{ 
-        Name       = "Antigravity Tools"
+        Name       = "Antigravity IDE"
         Type       = "DirectLink"
-        # Using the direct link to the GUI Manager version you've used successfully
-        Target     = "https://github.com/google/antigravity/releases/download/v3.3.48/Antigravity-Setup.exe" 
-        InstallCmd = "/allusers /S"
-        Version    = "3.3.48"; Date = "2026-02-26"
+        # Official Google Direct Link for Windows x64
+        Target     = "https://antigravity.google/download/windows-x64" 
+        InstallCmd = "/S" # Standard silent flag for Antigravity
+        Version    = "1.18.4"; Date = "2026-02-21"
     },
     [PSCustomObject]@{ 
         Name       = "Daily App"
@@ -69,15 +69,15 @@ foreach ($app in $selectedApps) {
     
     elseif ($app.Type -eq "DirectLink") {
         $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
-        Write-Host " -> Downloading..." -ForegroundColor Yellow
+        Write-Host " -> Downloading installer..." -ForegroundColor Yellow
         Invoke-WebRequest -Uri $app.Target -OutFile $tempFile
         
-        Write-Host " -> Installing silently..." -ForegroundColor Yellow
+        Write-Host " -> Running silent installation..." -ForegroundColor Yellow
         $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
         
-        # 20s timeout for installers that launch background processes
+        # 20s timeout for installers that launch background UI
         $process | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
-        Write-Host " -> Process finished." -ForegroundColor Green
+        Write-Host " -> Process complete." -ForegroundColor Green
         
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
