@@ -10,7 +10,7 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 # 1. YOUR APP INPUT SECTION
 # =====================================================================
 $MyApps = @(
-    # --- WINGET APPS (Public) ---
+    # --- WINGET APPS ---
     [PSCustomObject]@{ Name="Lightshot"; Type="Winget"; Target="Skillbrains.Lightshot"; Version="5.5.0"; Date="2026-02-25" },
     [PSCustomObject]@{ Name="VS Code"; Type="Winget"; Target="Microsoft.VisualStudioCode"; Version="Latest"; Date="2026-02-26" },
     [PSCustomObject]@{ Name="GitHub Desktop"; Type="Winget"; Target="GitHub.GitHubDesktop"; Version="Latest"; Date="2026-02-26" },
@@ -18,32 +18,28 @@ $MyApps = @(
     
     # Visual Studio with Python and C++ Workloads
     [PSCustomObject]@{ 
-        Name    = "Visual Studio 2022 (C++ & Python)" 
+        Name    = "Visual Studio 2022" 
         Type    = "Winget" 
         Target  = "Microsoft.VisualStudio.2022.Community" 
         Args    = "--override `"--add Microsoft.VisualStudio.Workload.NativeDesktop --add Microsoft.VisualStudio.Workload.Python --passive --norestart`""
-        Version = "Latest" 
-        Date    = "2026-02-26" 
+        Version = "Latest"; Date = "2026-02-26" 
     },
     
-    # --- GIT REPOS (Antigravity) ---
+    # --- DIRECT LINK APPS (Installers) ---
     [PSCustomObject]@{ 
-        Name    = "Clone Antigravity Repo"
-        Type    = "GitClone"
-        Target  = "https://github.com/google/antigravity.git" 
-        Dest    = "$HOME\Documents\Antigravity"
-        Version = "Main"
-        Date    = "2026-02-26"
+        Name       = "Antigravity Tools"
+        Type       = "DirectLink"
+        # Using the direct link to the GUI Manager version you've used successfully
+        Target     = "https://github.com/google/antigravity/releases/download/v3.3.48/Antigravity-Setup.exe" 
+        InstallCmd = "/allusers /S"
+        Version    = "3.3.48"; Date = "2026-02-26"
     },
-
-    # --- DIRECT LINK APPS (Private) ---
     [PSCustomObject]@{ 
-        Name    = "Daily App"
-        Type    = "DirectLink"
-        Target  = "https://github.com/11h12/winapp/releases/download/v1.0/daily-app-setup.exe"
+        Name       = "Daily App"
+        Type       = "DirectLink"
+        Target     = "https://github.com/11h12/winapp/releases/download/v1.0/daily-app-setup.exe"
         InstallCmd = "/S"
-        Version = "2.1.0"
-        Date    = "2026-01-28"
+        Version    = "2.1.0"; Date = "2026-01-28"
     }
 )
 
@@ -51,7 +47,7 @@ $MyApps = @(
 # 2. THE HYBRID ENGINE
 # =====================================================================
 Write-Host "Loading your setup menu..." -ForegroundColor Cyan
-$selectedApps = $MyApps | Select-Object Name, Type, Version, Date | Out-GridView -Title "Select Apps/Repos (Hold CTRL to select multiple)" -PassThru
+$selectedApps = $MyApps | Select-Object Name, Type, Version, Date | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
 
 if ($null -eq $selectedApps) { exit }
 
@@ -60,7 +56,7 @@ foreach ($app in $selectedApps) {
     Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
     if ($app.Type -eq "Winget") {
-        Write-Host " -> Checking/Installing via Winget..." -ForegroundColor Yellow
+        Write-Host " -> Installing via Winget..." -ForegroundColor Yellow
         $argList = "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements"
         if ($app.Args) { $argList += " $($app.Args)" }
         
@@ -71,31 +67,18 @@ foreach ($app in $selectedApps) {
         else { Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red }
     }
     
-    elseif ($app.Type -eq "GitClone") {
-        if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-            Write-Host " -> Installing Git..." -ForegroundColor Yellow
-            Start-Process -FilePath "winget" -ArgumentList "install --id Git.Git -e --silent --accept-source-agreements" -Wait
-        }
-        if (Test-Path $app.Dest) {
-            Write-Host " -> Path $($app.Dest) already exists. Skipping." -ForegroundColor Yellow
-        } else {
-            git clone $app.Target $app.Dest
-            Write-Host " -> Clone Successful!" -ForegroundColor Green
-        }
-    }
-
     elseif ($app.Type -eq "DirectLink") {
         $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
+        Write-Host " -> Downloading..." -ForegroundColor Yellow
         Invoke-WebRequest -Uri $app.Target -OutFile $tempFile
+        
+        Write-Host " -> Installing silently..." -ForegroundColor Yellow
         $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
         
-        # 15s timeout for background apps like Lightshot
-        $countdown = 15
-        while (-not $process.HasExited -and $countdown -gt 0) {
-            Start-Sleep -Seconds 1
-            $countdown--
-        }
-        Write-Host " -> Installation complete." -ForegroundColor Green
+        # 20s timeout for installers that launch background processes
+        $process | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
+        Write-Host " -> Process finished." -ForegroundColor Green
+        
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
 }
