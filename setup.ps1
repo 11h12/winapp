@@ -25,13 +25,13 @@ $MyApps = @(
         Version = "Latest"; Date = "2026-02-26" 
     },
     
-    # --- DIRECT LINK APPS (Private/Manual Installers) ---
+    # --- DIRECT LINK APPS (Installers) ---
     [PSCustomObject]@{ 
         Name       = "Antigravity IDE"
         Type       = "DirectLink"
         # Official Google Direct Link for Windows x64
         Target     = "https://antigravity.google/download/windows-x64" 
-        InstallCmd = "/S" # Standard silent flag for Antigravity
+        InstallCmd = "/S" 
         Version    = "1.18.4"; Date = "2026-02-21"
     },
     [PSCustomObject]@{ 
@@ -56,7 +56,7 @@ foreach ($app in $selectedApps) {
     Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
     
     if ($app.Type -eq "Winget") {
-        Write-Host " -> Installing via Winget..." -ForegroundColor Yellow
+        Write-Host " -> Checking/Installing via Winget..." -ForegroundColor Yellow
         $argList = "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements"
         if ($app.Args) { $argList += " $($app.Args)" }
         
@@ -70,14 +70,14 @@ foreach ($app in $selectedApps) {
     elseif ($app.Type -eq "DirectLink") {
         $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
         Write-Host " -> Downloading installer..." -ForegroundColor Yellow
-        Invoke-WebRequest -Uri $app.Target -OutFile $tempFile
+        # The 'Target' is now guaranteed to have the Antigravity URL
+        Invoke-WebRequest -Uri $app.Target -OutFile $tempFile -ErrorAction Stop
         
         Write-Host " -> Running silent installation..." -ForegroundColor Yellow
         $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
         
-        # 20s timeout for installers that launch background UI
-        $process | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
-        Write-Host " -> Process complete." -ForegroundColor Green
+        $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+        Write-Host " -> Process finished." -ForegroundColor Green
         
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
