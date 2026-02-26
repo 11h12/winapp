@@ -47,18 +47,23 @@ $MyApps = @(
 # 2. THE HYBRID ENGINE
 # =====================================================================
 Write-Host "Loading your setup menu..." -ForegroundColor Cyan
+
+# Select-Object ensures only the chosen columns show in the popup
 $selectedApps = $MyApps | Select-Object Name, Type, Version, Date | Out-GridView -Title "Select Apps to Install (Hold CTRL to select multiple)" -PassThru
 
 if ($null -eq $selectedApps) { exit }
 
 foreach ($app in $selectedApps) {
+    # Find the original object from $MyApps to get Target and InstallCmd
+    $appData = $MyApps | Where-Object { $_.Name -eq $app.Name }
+
     Write-Host "`n========================================" -ForegroundColor Cyan
-    Write-Host "Processing: $($app.Name)" -ForegroundColor Cyan
+    Write-Host "Processing: $($appData.Name)" -ForegroundColor Cyan
     
-    if ($app.Type -eq "Winget") {
+    if ($appData.Type -eq "Winget") {
         Write-Host " -> Checking/Installing via Winget..." -ForegroundColor Yellow
-        $argList = "install --id $($app.Target) -e --silent --accept-package-agreements --accept-source-agreements"
-        if ($app.Args) { $argList += " $($app.Args)" }
+        $argList = "install --id $($appData.Target) -e --silent --accept-package-agreements --accept-source-agreements"
+        if ($appData.Args) { $argList += " $($appData.Args)" }
         
         $process = Start-Process -FilePath "winget" -ArgumentList $argList -Wait -PassThru -NoNewWindow -ErrorAction SilentlyContinue
         
@@ -67,17 +72,22 @@ foreach ($app in $selectedApps) {
         else { Write-Host " -> Failed. Exit code: $($process.ExitCode)" -ForegroundColor Red }
     }
     
-    elseif ($app.Type -eq "DirectLink") {
-        $tempFile = "$env:TEMP\$($app.Name -replace ' ', '').exe"
-        Write-Host " -> Downloading installer..." -ForegroundColor Yellow
-        # The 'Target' is now guaranteed to have the Antigravity URL
-        Invoke-WebRequest -Uri $app.Target -OutFile $tempFile -ErrorAction Stop
+    elseif ($appData.Type -eq "DirectLink") {
+        $tempFile = "$env:TEMP\$($appData.Name -replace ' ', '').exe"
+        Write-Host " -> Downloading installer from $($appData.Target)..." -ForegroundColor Yellow
         
-        Write-Host " -> Running silent installation..." -ForegroundColor Yellow
-        $process = Start-Process -FilePath $tempFile -ArgumentList $app.InstallCmd -PassThru -NoNewWindow
-        
-        $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
-        Write-Host " -> Process finished." -ForegroundColor Green
+        try {
+            Invoke-WebRequest -Uri $appData.Target -OutFile $tempFile -ErrorAction Stop
+            
+            Write-Host " -> Running silent installation..." -ForegroundColor Yellow
+            $process = Start-Process -FilePath $tempFile -ArgumentList $appData.InstallCmd -PassThru -NoNewWindow
+            
+            # Wait for up to 30 seconds for the installer to finish
+            $process | Wait-Process -Timeout 30 -ErrorAction SilentlyContinue
+            Write-Host " -> Process complete." -ForegroundColor Green
+        } catch {
+            Write-Host " -> ERROR: Could not download or run the file." -ForegroundColor Red
+        }
         
         if (Test-Path $tempFile) { Remove-Item $tempFile -Force }
     }
