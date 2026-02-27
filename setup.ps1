@@ -64,7 +64,6 @@ Add-Type -AssemblyName System.Windows.Forms
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="28"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Tick box -->
@@ -79,14 +78,6 @@ Add-Type -AssemblyName System.Windows.Forms
 
                                 <!-- Content -->
                                 <ContentPresenter Grid.Column="1" Margin="10,0,0,0" VerticalAlignment="Center"/>
-
-                                <!-- Type badge -->
-                                <Border x:Name="TypeBadge" Grid.Column="2" CornerRadius="4"
-                                        Padding="8,3" VerticalAlignment="Center"
-                                        Background="#313244">
-                                    <TextBlock x:Name="TypeText" FontSize="10" Foreground="#6C7086"
-                                               VerticalAlignment="Center"/>
-                                </Border>
                             </Grid>
                         </Border>
 
@@ -247,8 +238,8 @@ function Update-CountText {
 
 # Wire up Checked/Unchecked events for live count
 foreach ($cb in $checkboxes) {
-    $cb.Add_Checked({ Update-CountText })
-    $cb.Add_Unchecked({ Update-CountText })
+    $cb.Add_Checked({ Update-CountText }) | Out-Null
+    $cb.Add_Unchecked({ Update-CountText }) | Out-Null
 }
 
 # Select All toggle
