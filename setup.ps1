@@ -250,20 +250,23 @@ $selectAllBtn.Add_Click({
         else { $selectAllBtn.Content = 'Deselect All' }
     })
 
+# Shared state hashtable (closures capture by reference)
+$state = @{ selectedApps = @(); results = @(); totalCount = 0 }
+
 # Install button
-$global:selectedApps = @()
 $installBtn.Add_Click({
-        $global:selectedApps = $checkboxes | Where-Object { $_.IsChecked } | ForEach-Object { $_.Tag }
-        if ($global:selectedApps.Count -eq 0) {
+        $state.selectedApps = @($checkboxes | Where-Object { $_.IsChecked } | ForEach-Object { $_.Tag })
+        if ($state.selectedApps.Count -eq 0) {
             [System.Windows.MessageBox]::Show('Please select at least one app.', 'Setup', 'OK', 'Warning') | Out-Null
             return
         }
+        $state.totalCount = $state.selectedApps.Count
         $selectionWindow.DialogResult = $true
         $selectionWindow.Close()
     })
 
 $result = $selectionWindow.ShowDialog()
-if ($result -ne $true -or $global:selectedApps.Count -eq 0) { exit }
+if ($result -ne $true -or $state.selectedApps.Count -eq 0) { exit }
 
 # =====================================================================
 # 3. PROGRESS WINDOW
@@ -319,7 +322,7 @@ $progressBar = $progressWindow.FindName('ProgressBar')
 $progressPercent = $progressWindow.FindName('ProgressPercent')
 $appRowPanel = $progressWindow.FindName('AppRowPanel')
 
-$progressBar.Maximum = $global:selectedApps.Count
+$progressBar.Maximum = $state.totalCount
 
 # Helper: create a per-app row and return references
 function New-AppRow {
@@ -427,7 +430,7 @@ function New-AppRow {
 
 # Pre-populate per-app rows
 $appRows = @{}
-foreach ($app in $global:selectedApps) {
+foreach ($app in $state.selectedApps) {
     $row = New-AppRow -AppName $app.Name -AppVersion $app.Version -AppType $app.Type
     $appRowPanel.Children.Add($row.Card) | Out-Null
     $appRows[$app.Name] = $row
@@ -496,17 +499,16 @@ function Set-AppRowState {
     }
 }
 
-# Track results
-$global:results = @()
-
 # Run installs after window is shown
 $progressWindow.Add_ContentRendered({
+        $total = $state.totalCount
+        if ($total -eq 0) { return }
         $i = 0
-        foreach ($app in $global:selectedApps) {
+        foreach ($app in $state.selectedApps) {
             $i++
-            $statusText.Text = 'Installing {0}  ({1} of {2})...' -f $app.Name, $i, $global:selectedApps.Count
+            $statusText.Text = 'Installing {0}  ({1} of {2})...' -f $app.Name, $i, $total
             $progressBar.Value = $i - 1
-            $pct = [math]::Round((($i - 1) / $global:selectedApps.Count) * 100)
+            $pct = [math]::Round((($i - 1) / $total) * 100)
             $progressPercent.Text = '{0}%' -f $pct
 
             # Mark this app as installing
@@ -550,7 +552,7 @@ $progressWindow.Add_ContentRendered({
             }
 
             $entry = [PSCustomObject]@{ Name = $app.Name; Success = $success; Detail = $detail }
-            $global:results += $entry
+            $state.results += $entry
 
             # Update the row
             if ($success) {
@@ -567,7 +569,7 @@ $progressWindow.Add_ContentRendered({
 
             # Update overall progress
             $progressBar.Value = $i
-            $pct = [math]::Round(($i / $global:selectedApps.Count) * 100)
+            $pct = [math]::Round(($i / $total) * 100)
             $progressPercent.Text = '{0}%' -f $pct
 
             # Refresh UI
@@ -575,15 +577,15 @@ $progressWindow.Add_ContentRendered({
         }
 
         # Final state
-        $failedItems = @($global:results | Where-Object { -not $_.Success })
+        $failedItems = @($state.results | Where-Object { -not $_.Success })
         if ($failedItems.Count -eq 0) {
             $titleText.Text = [char]0x2705 + '  All Done!'
-            $statusText.Text = 'All {0} apps installed successfully.' -f $global:selectedApps.Count
+            $statusText.Text = 'All {0} apps installed successfully.' -f $total
             $statusText.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#A6E3A1')
         }
         else {
             $titleText.Text = [char]0x26A0 + '  Finished with Errors'
-            $statusText.Text = '{0} of {1} apps failed. Check details below.' -f $failedItems.Count, $global:selectedApps.Count
+            $statusText.Text = '{0} of {1} apps failed. Check details below.' -f $failedItems.Count, $total
             $statusText.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#F38BA8')
         }
 
