@@ -189,9 +189,19 @@ foreach ($app in $MyApps) {
     $cb = New-Object System.Windows.Controls.CheckBox
     $cb.Tag = $app
 
-    # Content: name + version stacked
-    $contentPanel = New-Object System.Windows.Controls.StackPanel
-    $contentPanel.Orientation = 'Vertical'
+    # Content: name + version + type in a grid layout
+    $contentGrid = New-Object System.Windows.Controls.Grid
+    $cgCol0 = New-Object System.Windows.Controls.ColumnDefinition
+    $cgCol0.Width = [System.Windows.GridLength]::new(1, [System.Windows.GridUnitType]::Star)
+    $cgCol1 = New-Object System.Windows.Controls.ColumnDefinition
+    $cgCol1.Width = [System.Windows.GridLength]::Auto
+    $contentGrid.ColumnDefinitions.Add($cgCol0)
+    $contentGrid.ColumnDefinitions.Add($cgCol1)
+
+    # Left: name + version stacked
+    $textPanel = New-Object System.Windows.Controls.StackPanel
+    $textPanel.Orientation = 'Vertical'
+    [System.Windows.Controls.Grid]::SetColumn($textPanel, 0)
 
     $nameBlock = New-Object System.Windows.Controls.TextBlock
     $nameBlock.Text = $app.Name
@@ -204,20 +214,29 @@ foreach ($app in $MyApps) {
     $versionBlock.FontSize = 11
     $versionBlock.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#6C7086')
 
-    $contentPanel.Children.Add($nameBlock) | Out-Null
-    $contentPanel.Children.Add($versionBlock) | Out-Null
-    $cb.Content = $contentPanel
+    $textPanel.Children.Add($nameBlock) | Out-Null
+    $textPanel.Children.Add($versionBlock) | Out-Null
+
+    # Right: type badge
+    $typeBadge = New-Object System.Windows.Controls.Border
+    $typeBadge.CornerRadius = [System.Windows.CornerRadius]::new(4)
+    $typeBadge.Background = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#313244')
+    $typeBadge.Padding = [System.Windows.Thickness]::new(8, 3, 8, 3)
+    $typeBadge.VerticalAlignment = 'Center'
+    [System.Windows.Controls.Grid]::SetColumn($typeBadge, 1)
+
+    $typeLabel = New-Object System.Windows.Controls.TextBlock
+    $typeLabel.Text = $app.Type.ToUpper()
+    $typeLabel.FontSize = 10
+    $typeLabel.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString('#6C7086')
+    $typeBadge.Child = $typeLabel
+
+    $contentGrid.Children.Add($textPanel) | Out-Null
+    $contentGrid.Children.Add($typeBadge) | Out-Null
+    $cb.Content = $contentGrid
 
     $appListPanel.Children.Add($cb) | Out-Null
     $checkboxes += $cb
-
-    # After adding to visual tree, find TypeText and set type badge
-    $cb.ApplyTemplate()
-    $tmpl = $cb.Template
-    $typeText = $tmpl.FindName('TypeText', $cb)
-    if ($typeText) {
-        $typeText.Text = $app.Type.ToUpper()
-    }
 }
 
 # Update count text helper
